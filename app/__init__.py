@@ -3,10 +3,15 @@ from flask_cors import CORS
 from datetime import datetime
 from app.routes.audit_log_routes import audit_log_bp
 from app.database import get_db_connection
+from .auth import init_jwt
+from .config import JWT_PUBLIC_KEY
 
 def create_app():
     app = Flask(__name__)
     CORS(app)
+
+    # # Initialize JWT authentication
+    # init_jwt(app, JWT_PUBLIC_KEY)
 
     app.register_blueprint(audit_log_bp)
 

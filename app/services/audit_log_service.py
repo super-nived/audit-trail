@@ -13,26 +13,20 @@ def insert_audit_log():
             
         current_app.logger.info(f"Received POST payload: {data}")
 
-        # Required fields with their type validations
+        # Required fields validation
         required_fields = {
-            'ModuleID': (lambda x: validate_integer(x, 'ModuleID', min_value=1)),
-            'AccessCode': (lambda x: validate_string(x, 'AccessCode', 40)),
-            'ActionDesc': (lambda x: validate_string(x, 'ActionDesc', 100)),
+            'ActionCode': (lambda x: validate_string(x, 'ActionCode', 50)),
             'Changes': (lambda x: validate_string(x, 'Changes', 1000000)),
             'ErrorCode': (lambda x: validate_string(x, 'ErrorCode', 50)),
-            'PlantList': (lambda x: validate_string(x, 'PlantList', 100)),
             'Euser': (lambda x: validate_string(x, 'Euser', 25))
         }
 
-        # Optional fields with their type validations
+        # Optional fields
         optional_fields = {
             'CaseID': (lambda x: validate_string(x, 'CaseID', 50, allow_empty=True)),
             'Operation': (lambda x: validate_string(x, 'Operation', 50, allow_empty=True)),
             'AssetCode': (lambda x: validate_string(x, 'AssetCode', 40, allow_empty=True)),
-            'Parameter1': (lambda x: validate_string(x, 'Parameter1', 50, allow_empty=True)),
-            'Parameter2': (lambda x: validate_string(x, 'Parameter2', 50, allow_empty=True)),
-            'Parameter3': (lambda x: validate_string(x, 'Parameter3', 50, allow_empty=True)),
-            'Parameter4': (lambda x: validate_string(x, 'Parameter4', 50, allow_empty=True))
+            'PlantCode': (lambda x: validate_string(x, 'PlantCode', 50, allow_empty=True))
         }
 
         # Validate required fields
@@ -52,35 +46,28 @@ def insert_audit_log():
 
         # Prepare parameters
         params = {
-            'ModuleID': int(data['ModuleID']),
-            'AccessCode': str(data['AccessCode']),
-            'ActionDesc': str(data['ActionDesc']),
+            'ActionCode': str(data['ActionCode']),
             'Changes': str(data['Changes']),
             'ErrorCode': str(data['ErrorCode']),
-            'PlantList': str(data['PlantList']),
             'Euser': str(data['Euser']),
             'CaseID': str(data.get('CaseID', '')),
             'Operation': str(data.get('Operation', '')),
             'AssetCode': str(data.get('AssetCode', '')),
-            'Parameter1': str(data.get('Parameter1', '')),
-            'Parameter2': str(data.get('Parameter2', '')),
-            'Parameter3': str(data.get('Parameter3', '')),
-            'Parameter4': str(data.get('Parameter4', ''))
+            'PlantCode': str(data.get('PlantCode', ''))
         }
 
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Call spInsertAuditLog stored procedure
+        # Call USP_MES_InsertAuditLog stored procedure
         query = """
-            EXEC spInsertAuditLog 
-            @ModuleID=%s, @AccessCode=%s, @ActionDesc=%s, @Changes=%s, @ErrorCode=%s, @PlantList=%s, @Euser=%s, @CaseID=%s, @Operation=%s, @AssetCode=%s, @Parameter1=%s, @Parameter2=%s, @Parameter3=%s, @Parameter4=%s
+            EXEC USP_MES_InsertAuditLog 
+            @ActionCode=%s, @Changes=%s, @ErrorCode=%s, @CaseID=%s, 
+            @Operation=%s, @AssetCode=%s, @PlantCode=%s, @Euser=%s
         """
         cursor.execute(query, (
-            params['ModuleID'], params['AccessCode'], params['ActionDesc'], params['Changes'],
-            params['ErrorCode'], params['PlantList'], params['Euser'], params['CaseID'],
-            params['Operation'], params['AssetCode'], params['Parameter1'],
-            params['Parameter2'], params['Parameter3'], params['Parameter4']
+            params['ActionCode'], params['Changes'], params['ErrorCode'], params['CaseID'],
+            params['Operation'], params['AssetCode'], params['PlantCode'], params['Euser']
         ))
         conn.commit()
 
@@ -102,36 +89,34 @@ def get_audit_logs():
     try:
         # Extract query parameters
         params = {
-            'ModuleID': request.args.get('ModuleID', '0'),
-            'Text': request.args.get('Text', ''),
+            'SearchString': request.args.get('SearchString', ''),
             'FromDate': request.args.get('FromDate'),
             'ToDate': request.args.get('ToDate'),
             'PageNumber': request.args.get('PageNumber', '1'),
             'PageSize': request.args.get('PageSize', '50'),
-            'Euser': request.args.get('Euser', ''),
-            'Err': request.args.get('Err', ''),
-            'PlantList': request.args.get('PlantList', ''),
+            'ShowErrorOnly': request.args.get('ShowErrorOnly', ''),
             'CaseID': request.args.get('CaseID', ''),
             'Operation': request.args.get('Operation', ''),
-            'ActionDesc': request.args.get('ActionDesc', '')
+            'ActionCode': request.args.get('ActionCode', ''),
+            'Euser': request.args.get('Euser', ''),
+            'PlantCode': request.args.get('PlantCode', '')
         }
 
         current_app.logger.info(f"Received GET params: {params}")
 
         # Type validations
         validations = {
-            'ModuleID': (lambda x: validate_integer(x, 'ModuleID', min_value=0)),
-            'Text': (lambda x: validate_string(x, 'Text', 500, allow_empty=True)),
+            'SearchString': (lambda x: validate_string(x, 'SearchString', 500, allow_empty=True)),
             'FromDate': (lambda x: validate_datetime(x, 'FromDate') if x else (True, "")),
             'ToDate': (lambda x: validate_datetime(x, 'ToDate') if x else (True, "")),
             'PageNumber': (lambda x: validate_integer(x, 'PageNumber', min_value=1)),
             'PageSize': (lambda x: validate_integer(x, 'PageSize', min_value=1)),
-            'Euser': (lambda x: validate_string(x, 'Euser', 50, allow_empty=True)),
-            'Err': (lambda x: validate_string(x, 'Err', 1, allow_empty=True)),
-            'PlantList': (lambda x: validate_string(x, 'PlantList', 50, allow_empty=True)),
+            'ShowErrorOnly': (lambda x: validate_string(x, 'ShowErrorOnly', 1, allow_empty=True)),
             'CaseID': (lambda x: validate_string(x, 'CaseID', 50, allow_empty=True)),
             'Operation': (lambda x: validate_string(x, 'Operation', 50, allow_empty=True)),
-            'ActionDesc': (lambda x: validate_string(x, 'ActionDesc', 100, allow_empty=True))
+            'ActionCode': (lambda x: validate_string(x, 'ActionCode', 50, allow_empty=True)),
+            'Euser': (lambda x: validate_string(x, 'Euser', 50, allow_empty=True)),
+            'PlantCode': (lambda x: validate_string(x, 'PlantCode', 50, allow_empty=True))
         }
 
         # Validate all parameters
@@ -141,16 +126,15 @@ def get_audit_logs():
                 return jsonify({"error": error}), 400
 
         # Parse validated parameters
-        module_id = int(params['ModuleID'])
-        text = params['Text']
+        search_string = params['SearchString']
         page_number = int(params['PageNumber'])
         page_size = int(params['PageSize'])
-        euser = params['Euser']
-        err = params['Err']
-        plant_list = params['PlantList']
+        show_error_only = params['ShowErrorOnly']
         case_id = params['CaseID']
         operation = params['Operation']
-        action_desc = params['ActionDesc']
+        action_code = params['ActionCode']
+        euser = params['Euser']
+        plant_code = params['PlantCode']
 
         # Handle date parameters
         try:
@@ -162,15 +146,15 @@ def get_audit_logs():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Call USPGet_Auditlog stored procedure
+        # Call USP_MES_GetAuditLog stored procedure
         query = """
-            EXEC USPGet_Auditlog 
-            @ModuleID=%s, @Text=%s, @FromDate=%s, @ToDate=%s, @PageNumber=%s, @PageSize=%s, @Euser=%s, @Err=%s, @PlantList=%s, @CaseID=%s, @Operation=%s, @ActionDesc=%s
+            EXEC USP_MES_GetAuditLog 
+            @SearchString=%s, @FromDate=%s, @ToDate=%s, @PageNumber=%s, @PageSize=%s, 
+            @ShowErrorOnly=%s, @CaseID=%s, @Operation=%s, @ActionCode=%s, @Euser=%s, @PlantCode=%s
         """
         cursor.execute(query, (
-            module_id, text, from_date, to_date,
-            page_number, page_size, euser, err,
-            plant_list, case_id, operation, action_desc
+            search_string, from_date, to_date, page_number, page_size, 
+            show_error_only, case_id, operation, action_code, euser, plant_code
         ))
 
         # Fetch results
@@ -185,11 +169,11 @@ def get_audit_logs():
                     row_dict[columns[i]] = value
             results.append(row_dict)
 
-        # Get total count
-        total_count = 0
+        # Get total count if available
+        total_count = len(results)
         if cursor.nextset():
             count_row = cursor.fetchone()
-            total_count = count_row[0] if count_row else 0
+            total_count = count_row[0] if count_row else total_count
 
         return jsonify({
             "data": results,
